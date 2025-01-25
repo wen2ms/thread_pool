@@ -1,12 +1,15 @@
 #include "thread_pool.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+const int kMaxAppendNum = 2;
 
 typedef struct Task {
-    void (* function)(void* arg);
+    void (*function)(void* arg);
     void* arg;
 } Task;
 
@@ -80,7 +83,7 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
 
         thread_pool->shotdown = 0;
 
-        pthread_create(&thread_pool->manager_id, NULL, manager, NULL);
+        pthread_create(&thread_pool->manager_id, NULL, manager, thread_pool);
         for (int i = 0; i < min_num; ++i) {
             pthread_create(&thread_pool->thread_ids, NULL, worker, thread_pool);
         }
@@ -103,6 +106,59 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
     return NULL;
 }
 
+void* manager(void* arg) {
+    ThreadPool* thread_pool = (ThreadPool*)arg;
+
+    while (!thread_pool->shotdown) {
+        sleep(3);
+
+        pthread_mutex_lock(&thread_pool->mutex_pool);
+
+        int queue_size = thread_pool->queue_size;
+        int alive_num = thread_pool->alive_num;
+
+        pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+        pthread_mutex_lock(&thread_pool->mutex_busy);
+
+        int busy_num = thread_pool->busy_num;
+
+        pthread_mutex_unlock(&thread_pool->mutex_busy);
+
+        if (queue_size > alive_num && alive_num < thread_pool->max_num) {
+            pthread_mutex_lock(&thread_pool->mutex_pool);
+
+            int counter = 0;
+
+            for (int i = 0; i < thread_pool->max_num && counter < kMaxAppendNum && thread_pool->alive_num < thread_pool->max_num;
+                 ++i) {
+                if (thread_pool->thread_ids[i] == 0) {
+                    pthread_create(&thread_pool->thread_ids[i], NULL, worker, thread_pool);
+
+                    counter++;
+                    thread_pool->alive_num++;
+                }
+            }
+
+            pthread_mutex_unlock(&thread_pool->mutex_pool);
+        }
+
+        if (busy_num * 2 < alive_num && alive_num > thread_pool->min_num) {
+            pthread_mutex_lock(&thread_pool->mutex_pool);
+
+            thread_pool->exit_num = kMaxAppendNum;
+
+            pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+            for (int i = 0; i < kMaxAppendNum; ++i) {
+                pthread_cond_signal(&thread_pool->is_full);
+            }
+        }
+    }
+
+    return NULL;
+}
+
 void* worker(void* arg) {
     ThreadPool* thread_pool = (ThreadPool*)arg;
 
@@ -111,6 +167,13 @@ void* worker(void* arg) {
 
         while (thread_pool->queue_size == 0 && !thread_pool->shotdown) {
             pthread_cond_wait(&thread_pool->is_full, &thread_pool->mutex_pool);
+
+            if (thread_pool->exit_num > 0)  {
+                thread_pool->exit_num--;
+                pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+                pthread_exit(NULL);
+            }
         }
 
         if (thread_pool->shotdown) {
@@ -120,7 +183,7 @@ void* worker(void* arg) {
         }
 
         Task task;
-        
+
         task.function = thread_pool->task_queue[thread_pool->queue_front].function;
         task.arg = thread_pool->task_queue[thread_pool->queue_front].arg;
 
