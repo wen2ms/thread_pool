@@ -172,14 +172,14 @@ void* worker(void* arg) {
                 thread_pool->exit_num--;
                 pthread_mutex_unlock(&thread_pool->mutex_pool);
 
-                pthread_exit(NULL);
+                thread_exit(thread_pool);
             }
         }
 
         if (thread_pool->shotdown) {
             pthread_mutex_unlock(&thread_pool->mutex_pool);
 
-            pthread_exit(NULL);
+            thread_exit(thread_pool);
         }
 
         Task task;
@@ -213,4 +213,18 @@ void* worker(void* arg) {
     }
 
     return NULL;
+}
+
+void thread_exit(ThreadPool* thread_pool) {
+    pthread_t tid = pthread_self();
+
+    for (int i = 0; i < thread_pool->max_num; ++i) {
+        if (thread_pool->thread_ids[i] == tid) {
+            thread_pool->thread_ids[i] = 0;
+
+            printf("thread %p exiting...\n", tid);
+        }
+    }
+
+    pthread_exit(NULL);
 }
