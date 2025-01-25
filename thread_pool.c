@@ -106,6 +106,28 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
     return NULL;
 }
 
+void thread_pool_add_task(ThreadPool* thread_pool, void(*function)(void*), void* arg) {
+    pthread_mutex_lock(&thread_pool->mutex_pool);
+
+    while (thread_pool->queue_size == thread_pool->queue_capacity && !thread_pool->shotdown) {
+        pthread_cond_wait(&thread_pool->is_empty, &thread_pool->mutex_pool);
+    }
+
+    if (thread_pool->shotdown) {
+        pthread_mutex_unlock(&thread_pool->mutex_pool);
+        return;
+    }
+
+    thread_pool->task_queue[thread_pool->queue_rear].function = function;
+    thread_pool->task_queue[thread_pool->queue_rear].arg = arg;
+
+    thread_pool->queue_rear = (thread_pool->queue_rear + 1) % thread_pool->queue_capacity;
+    thread_pool->queue_size++;
+
+    pthread_cond_broadcast(&thread_pool->is_full);
+    pthread_mutex_unlock(&thread_pool->mutex_pool);
+}
+
 void* manager(void* arg) {
     ThreadPool* thread_pool = (ThreadPool*)arg;
 
@@ -194,6 +216,8 @@ void* worker(void* arg) {
 
         thread_pool->queue_front = (thread_pool->queue_front + 1) % thread_pool->queue_capacity;
         thread_pool->queue_size--;
+
+        pthread_cond_broadcast(&thread_pool->is_empty);
 
         pthread_mutex_unlock(&thread_pool->mutex_pool);
 
