@@ -170,9 +170,14 @@ void* worker(void* arg) {
 
             if (thread_pool->exit_num > 0)  {
                 thread_pool->exit_num--;
-                pthread_mutex_unlock(&thread_pool->mutex_pool);
 
-                thread_exit(thread_pool);
+                if (thread_pool->alive_num > thread_pool->min_num) {
+                    thread_pool->alive_num--;
+
+                    pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+                    thread_exit(thread_pool);
+                }
             }
         }
 
