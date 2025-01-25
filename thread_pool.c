@@ -82,7 +82,7 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
 
         pthread_create(&thread_pool->manager_id, NULL, manager, NULL);
         for (int i = 0; i < min_num; ++i) {
-            pthread_create(&thread_pool->thread_ids, NULL, worker, NULL);
+            pthread_create(&thread_pool->thread_ids, NULL, worker, thread_pool);
         }
 
         return thread_pool;
@@ -98,6 +98,55 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
 
     if (thread_pool) {
         free(thread_pool);
+    }
+
+    return NULL;
+}
+
+void* worker(void* arg) {
+    ThreadPool* thread_pool = (ThreadPool*)arg;
+
+    while (1) {
+        phtread_mutex_lock(&thread_pool->mutex_pool);
+
+        while (thread_pool->queue_size == 0 && !thread_pool->shotdown) {
+            pthread_cond_wait(&thread_pool->is_full, &thread_pool->mutex_pool);
+        }
+
+        if (thread_pool->shotdown) {
+            pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+            pthread_exit(NULL);
+        }
+
+        Task task;
+        
+        task.function = thread_pool->task_queue[thread_pool->queue_front].function;
+        task.arg = thread_pool->task_queue[thread_pool->queue_front].arg;
+
+        thread_pool->queue_front = (thread_pool->queue_front + 1) % thread_pool->queue_capacity;
+        thread_pool->queue_size--;
+
+        pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+        printf("thread %p starts working...\n", pthread_self());
+        pthread_mutex_lock(&thread_pool->mutex_busy);
+
+        thread_pool->busy_num++;
+
+        pthread_mutex_unlock(&thread_pool->mutex_busy);
+
+        task.function(task.arg);
+
+        free(task.arg);
+        task.arg = NULL;
+
+        printf("thread %p ends working...\n", pthread_self());
+        pthread_mutex_lock(&thread_pool->mutex_busy);
+
+        thread_pool->busy_num--;
+
+        pthread_mutex_unlock(&thread_pool->mutex_busy);
     }
 
     return NULL;
