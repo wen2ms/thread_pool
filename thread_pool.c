@@ -106,6 +106,40 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
     return NULL;
 }
 
+int thread_pool_destroy(ThreadPool* thread_pool) {
+    if (thread_pool == NULL) {
+        return -1;
+    }
+
+    thread_pool->shotdown = 1;
+    pthread_join(thread_pool->manager_id, NULL);
+
+    for (int i = 0; i < thread_pool->alive_num; ++i) {
+        pthread_cond_broadcast(&thread_pool->is_full);
+    }
+
+    if (thread_pool->task_queue) {
+        free(thread_pool->task_queue);
+        thread_pool->task_queue = NULL;
+    }
+
+    if (thread_pool->thread_ids) {
+        free(thread_pool->thread_ids);
+        thread_pool->thread_ids = NULL;
+    }
+
+    free(thread_pool);
+    thread_pool = NULL;
+
+    pthread_mutex_destroy(&thread_pool->mutex_pool);
+    pthread_mutex_destroy(&thread_pool->mutex_busy);
+
+    pthread_cond_destroy(&thread_pool->is_empty);
+    pthread_cond_destroy(&thread_pool->is_full);
+
+    return 0;
+}
+
 void thread_pool_add_task(ThreadPool* thread_pool, void(*function)(void*), void* arg) {
     pthread_mutex_lock(&thread_pool->mutex_pool);
 
