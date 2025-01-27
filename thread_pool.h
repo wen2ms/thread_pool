@@ -7,6 +7,10 @@ ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity);
 
 void thread_pool_add_task(ThreadPool* thread_pool, void(*function)(void*), void* arg);
 
+int thread_pool_busy_num(ThreadPool* thread_pool);
+
+int thread_pool_alive_num(ThreadPool* thread_pool);
+
 void* manager(void* arg); 
 
 void* worker(void* arg);

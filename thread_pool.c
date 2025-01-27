@@ -128,6 +128,22 @@ void thread_pool_add_task(ThreadPool* thread_pool, void(*function)(void*), void*
     pthread_mutex_unlock(&thread_pool->mutex_pool);
 }
 
+int thread_pool_busy_num(ThreadPool* thread_pool) {
+    pthread_mutex_lock(&thread_pool->mutex_busy);
+    int busy_num = thread_pool->busy_num;
+    pthread_mutex_unlock(&thread_pool->mutex_busy);
+
+    return busy_num;
+}
+
+int thread_pool_alive_num(ThreadPool* thread_pool) {
+    pthread_mutex_lock(&thread_pool->mutex_pool);
+    int alive_num = thread_pool->alive_num;
+    pthread_mutex_unlock(&thread_pool->mutex_pool);
+
+    return alive_num;
+}
+
 void* manager(void* arg) {
     ThreadPool* thread_pool = (ThreadPool*)arg;
 
