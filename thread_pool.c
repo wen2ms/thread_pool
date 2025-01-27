@@ -63,7 +63,7 @@ ThreadPool* thread_pool_create(int min_num, int max_num, int queue_capacity) {
         thread_pool->alive_num = min_num;
         thread_pool->exit_num = 0;
 
-        if (pthread_mutex_init(&thread_pool->mutex_pool, NULL) != 0 || ptrhead_mutex_init(&thread_pool->mutex_pool, NULL) != 0 ||
+        if (pthread_mutex_init(&thread_pool->mutex_pool, NULL) != 0 || pthread_mutex_init(&thread_pool->mutex_busy, NULL) != 0 ||
             pthread_cond_init(&thread_pool->is_full, NULL) != 0 || pthread_cond_init(&thread_pool->is_empty, NULL) != 0) {
             printf("mutex or condition init failed...\n");
             break;
@@ -85,7 +85,7 @@ ThreadPool* thread_pool_create(int min_num, int max_num, int queue_capacity) {
 
         pthread_create(&thread_pool->manager_id, NULL, manager, thread_pool);
         for (int i = 0; i < min_num; ++i) {
-            pthread_create(&thread_pool->thread_ids, NULL, worker, thread_pool);
+            pthread_create(&thread_pool->thread_ids[i], NULL, worker, thread_pool);
         }
 
         return thread_pool;
@@ -235,7 +235,7 @@ void* worker(void* arg) {
     ThreadPool* thread_pool = (ThreadPool*)arg;
 
     while (1) {
-        phtread_mutex_lock(&thread_pool->mutex_pool);
+        pthread_mutex_lock(&thread_pool->mutex_pool);
 
         while (thread_pool->queue_size == 0 && !thread_pool->shotdown) {
             pthread_cond_wait(&thread_pool->is_full, &thread_pool->mutex_pool);
