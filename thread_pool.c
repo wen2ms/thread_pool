@@ -39,7 +39,7 @@ struct ThreadPool {
     int shotdown;
 };
 
-ThreadPool* create_thread_pool(int min_num, int max_num, int queue_capacity) {
+ThreadPool* thread_pool_create(int min_num, int max_num, int queue_capacity) {
     ThreadPool* thread_pool = (ThreadPool*)malloc(sizeof(ThreadPool));
 
     do {
