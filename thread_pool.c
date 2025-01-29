@@ -128,14 +128,14 @@ int thread_pool_destroy(ThreadPool* thread_pool) {
         thread_pool->thread_ids = NULL;
     }
 
-    free(thread_pool);
-    thread_pool = NULL;
-
     pthread_mutex_destroy(&thread_pool->mutex_pool);
     pthread_mutex_destroy(&thread_pool->mutex_busy);
 
     pthread_cond_destroy(&thread_pool->is_empty);
     pthread_cond_destroy(&thread_pool->is_full);
+
+    free(thread_pool);
+    thread_pool = NULL;
 
     return 0;
 }
@@ -223,7 +223,7 @@ void* manager(void* arg) {
             pthread_mutex_unlock(&thread_pool->mutex_pool);
 
             for (int i = 0; i < kMaxAppendNum; ++i) {
-                pthread_cond_signal(&thread_pool->is_full);
+                pthread_cond_broadcast(&thread_pool->is_full);
             }
         }
     }

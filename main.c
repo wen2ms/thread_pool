@@ -10,7 +10,7 @@ void task_func(void* arg) {
 
     printf("thread %p, number = %d\n", pthread_self(), *num);
 
-    usleep(1000);
+    sleep(1);
 }
 
 int main() {
